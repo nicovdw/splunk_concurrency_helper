@@ -1,0 +1,7 @@
+|rest splunk_server=local /servicesNS/-/-/saved/searches search="is_scheduled=1" search="disabled=0"
+|fields search title author cron_schedule eai:acl.app eai:acl.sharing dispatch.earliest_time dispatch.latest_time action.summary_index search id allow_skew schedule_window
+|search allow_skew=0 schedule_window=0
+|search NOT (eai:acl.app=foo author=bob) <<<<<<<<filter here to match your scope
+|eval change_script="curl -k -u admin:password " + id + " -XPOST -d schedule_window=auto -d allow_skew=60s"
+|eval rollback_script="curl -k -u admin:password " + id + " -XPOST -d schedule_window=0 -d allow_skew=0"
+|fields title author eai:acl.app eai:acl.sharing change_script rollback_script schedule_window allow_skew
