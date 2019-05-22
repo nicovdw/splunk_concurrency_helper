@@ -1,0 +1,470 @@
+<form>
+  <label>Saved Search Analyzer</label>
+  <fieldset submitButton="true">
+    <input type="time" token="field1" searchWhenChanged="false">
+      <label></label>
+      <default>
+        <earliest>-12h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="text" token="span">
+      <label>span</label>
+      <default>5m</default>
+      <initialValue>5m</initialValue>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <chart>
+        <title>Schedule searches by completion time</title>
+        <search type="annotation">
+          <query>index=_internal ulimit cpu host=sh*  source="/opt/splunk/var/log/splunk/splunkd.log" | eval annotation=host." restarted"
+| eval annotation_label = annotation
+</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <search>
+          <query>index=_internal host=sh* sourcetype=scheduler (status="completed" OR status=success OR status="skipped" OR status="continued" OR
+            status="deferred") search_type!="*_acceleration" NOT "not allowed to run"
+            | eval alert_actions = if(isnull(alert_actions) OR alert_actions == "", "none", alert_actions)
+            | timechart span=$span$  count by status</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">1</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">1</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Total runtime for all scheduled searches</title>
+      <chart>
+        <search type="annotation">
+          <query>index=_internal ulimit cpu host=sh*  source="/opt/splunk/var/log/splunk/splunkd.log" | eval annotation=host." restarted"
+| eval annotation_label = annotation
+</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <search>
+          <query>index=_audit action=search host=sh* NOT search_id="rsa_scheduler*" NOT *ACCELERATE_DM*
+ (info="completed"  OR status=success)
+| timechart  span=$span$ count as NumSearches  p90(total_run_time) AS p90TimeInSeconds avg(total_run_time) AS AvgRunTimeInSeconds median(total_run_time) AS MedianRunTimeInSeconds
+| eval MedianRunTimeInSeconds=round(MedianRunTimeInSeconds,1)
+| eval p90TimeInSeconds=round(p90TimeInSeconds,1)
+| rename savedsearch_name as title</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">1</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">1</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Skipped Search by Reason</title>
+      <chart>
+        <search>
+          <query>index=_internal host=sh*. sourcetype=scheduler ( status="skipped") search_type!="*_acceleration"
+|timechart span=$span$  count by reason</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisEnd</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Searches running longer than their scheduled time</title>
+      <table>
+        <title>Blank or 0 earliest_time means all time search unless defined in the search</title>
+        <search>
+          <query>index=_internal host=sh*. sourcetype=scheduler ( status="skipped" OR status="continued" OR status="deferred") search_type!="*_acceleration"
+"The maximum number of concurrent running jobs for this historical scheduled search on this cluster has been reached"
+|stats dc(scheduled_time) as skip_count by savedsearch_name
+|sort - skip_count
+|join left savedsearch_name
+[
+|rest splunk_server=local /servicesNS/-/-/saved/searches
+  search="is_scheduled=1" search="disabled=0"
+  |fields search title author cron_schedule eai:acl.app dispatch.earliest_time dispatch.latest_time action.summary_index search
+  |rename title as savedsearch_name, dispatch.earliest_time as earliest_time, dispatch.latest_time AS latest_time
+]</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Top Searches evicting data from cache</title>
+      <table>
+        <search>
+          <query>(index=_audit host=sh*  action=search info=granted OR info=completed  search_id  NOT typeahead  NOT SummaryDirector  NOT _ACCELERATE_DM* NOT "search_id='rsa_*") OR (index=_introspection  host=sh* TERM(provenance))  | rename data.search_props.sid AS sid data.search_props.provenance AS provenance
+| rex "search=\'(?&lt;thesearch&gt;(?:\n|.)*?)\'\, autojoin"
+| rex max_match=100 field=search "(?:[^\"\']|^)index=(?&lt;indexes&gt;[^\s\=]+)"
+| rex max_match=100 field=search "tag=(?&lt;tags&gt;[^\s+\||\)]+)"
+| rex max_match=100 field=search "eventtype=(?&lt;eventtypes&gt;[^\s+\||\)]+)"
+| rex max_match=100 field=search "(?&lt;macros&gt;\`[^\s]+\`)"
+| eval total_days_searched=(search_lt-search_et)/86400
+| eval  total_hours_searched=total_days_searched*24
+| eval total_hours_searched=round(total_hours_searched,4)
+| eval total_days_searched=round(total_days_searched,0)
+| eval search_id=trim(search_id,"\'")
+| eval search_id=coalesce(search_id,sid)
+| eval origSid=search_id
+| rex field=search_id "subsearch_(?&lt;search_id&gt;.*)_\d+\.\d+"
+| eval api_et=if(api_et="N/A", search_et, api_et)
+| eval total_hours_searched=if(api_et="N/A", "AllTime",total_hours_searched)
+| eval total_days_searched=if(api_et="N/A", "AllTime",total_days_searched)
+| stats sum(duration_command_search_rawdata_bucketcache_miss) AS  duration__raw_cache_miss sum(invocations_command_search_index_bucketcache_miss) as count_index_cache_miss sum(invocations_command_search_rawdata_bucketcache_miss) as count_rawdata_cache_miss values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched values(user) AS users values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  values(thesearch) AS search values(savedsearch_name) AS savedsearch_name max(total_run_time) AS run_time values(result_count) AS result_count values(event_count) AS event_count values(searched_buckets) AS searched_buckets values(info) AS info values(provenance) AS provenance dc(origSid) AS numofsearchesinquery by search_id
+|eval total_missed_cache=count_index_cache_miss+count_rawdata_cache_miss
+|sort - total_missed_cache</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Searches running longer than 15 minutes,</title>
+      <viz type="timeline_app.timeline">
+        <search>
+          <query>(index=_audit host=sh*  action=search info=granted OR info=completed  search_id  NOT typeahead  NOT SummaryDirector  NOT _ACCELERATE_DM* NOT "search_id='rsa_*")
+| stats latest(_time) as _time  max(total_run_time) AS run_time  by search_id
+|where run_time&gt;900
+| eval run_time = (run_time * 1000)
+| table _time  search_id run_time</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="timeline_app.timeline.axisTimeFormat">SECONDS</option>
+        <option name="timeline_app.timeline.colorMode">categorical</option>
+        <option name="timeline_app.timeline.maxColor">#DA5C5C</option>
+        <option name="timeline_app.timeline.minColor">#FFE8E8</option>
+        <option name="timeline_app.timeline.numOfBins">9</option>
+        <option name="timeline_app.timeline.tooltipTimeFormat">SECONDS</option>
+        <option name="timeline_app.timeline.useColors">0</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="form.sid">$search_id$</set>
+        </drilldown>
+      </viz>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Search Drilldown (Work in progress)</title>
+      <table>
+        <search>
+          <query>index=_audit host=sh*  action=search (info=granted OR info=completed)  $form.sid$
+|stats latest(_time) as _time values(search) as search max(total_run_time) AS run_time values(result_count) AS result_count values(event_count) AS event_count values(searched_buckets) AS searched_buckets values(info) AS info by search_id</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Scheduled search Delay &gt; 300s</title>
+      <chart>
+        <search type="annotation">
+          <query>index=_audit host=sh* action=search user=manna2 (info=granted OR info=completed OR info=canceled OR info=failed) [search index=_audit host=sh* action=search info=granted "sourcetype=aws:firehose:json*" logGroup grouping pow user=manna2 |fields search_id]
+| eval annotation_label = info
+</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <search>
+          <query>index=_internal host=sh* source="/opt/splunk/var/log/splunk/scheduler.log" "status=continued" scheduled_time &gt; 0 | eval delay=(_time - scheduled_time) | search delay &gt; 300 | timechart span=$span$ limit=20 max(delay) by savedsearch_name</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">auto</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisEnd</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Queued Interactive search by Reason</title>
+      <chart>
+        <search>
+          <query>index=_internal source="*/splunkd.log" sourcetype=splunkd host=sh* component=DispatchManager "The maximum" username=* (log_level=WARN)  | timechart span=$span$ count by reason</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">1</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisEnd</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Load avg per Indexer</title>
+      <chart>
+        <search>
+          <query>index=_introspection host=idx*  sourcetype=splunk_resource_usage component=Hostwide
+| eval server = host
+| bin _time span=$span$
+| stats max(data.normalized_load_avg_1min) as dedup_load_average by server _time
+| timechart span=$span$  limit=100 avg(dedup_load_average) as load_average by server</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">1</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.overlayFields">completed</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Load Avg overall</title>
+      <chart>
+        <search>
+          <query>index=_introspection host=idx*  sourcetype=splunk_resource_usage component=Hostwide
+| eval server = host
+| bin _time span=$span$
+| stats max(data.normalized_load_avg_1min) as dedup_load_average by server _time
+| timechart span=$span$  median(dedup_load_average) as load_average</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">1</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.overlayFields">completed</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>CPU Usage by host</title>
+      <chart>
+        <search>
+          <query>index=_introspection host=idx* component=Hostwide | eval cpu_used_pct=(100-'data.cpu_idle_pct') | timechart limit=200 span=$span$  avg(cpu_used_pct) by host</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Median CPU usage</title>
+      <chart>
+        <title>CPU Usage Overall</title>
+        <search>
+          <query>index=_introspection host=idx* component=Hostwide | eval cpu_used_pct=(100-'data.cpu_idle_pct') | timechart span=$span$  median(cpu_used_pct)</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+</form>
