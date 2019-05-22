@@ -1,0 +1,6 @@
+| rest splunk_server=local /services/authorization/roles |fields title srchJobsQuota id
+|search srchJobsQuota>3
+| eval new_quota=case(srchJobsQuota<8, "4", srchJobsQuota>=8 AND srchJobsQuota<15, "5", srchJobsQuota>=15 AND srchJobsQuota<25, "6",srchJobsQuota>=25 AND srchJobsQuota<40, "7", srchJobsQuota>=40, "8")
+|eval change_script="curl -k -u admin:password -XPOST " + id + " -d " + "srchJobsQuota="+new_quota+ "\" || true"
+|eval rollback_script="curl -k -u admin:password -XPOST " + id + " -d " + "srchJobsQuota="+srchJobsQuota+ "\" || true"
+|fields srchJobsQuota new_quota title change_script rollback_script
