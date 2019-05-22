@@ -1,0 +1,12 @@
+index=_audit action=search host=<shcluster_search_heads> info="completed"  NOT "search_id='rsa_scheduler" 
+| eval search_type=case(match(search_id,"scheduler_"),"Scheduled",match(search_id,"SummaryDirector"),"Summarize")
+| eval search_type=if(isnull(search_type),"Ad-Hoc",search_type)
+|timechart span=300s  sum(total_run_time) as run_time  by search_type
+|eval sh=5, max_base=26, searches_per_cpu=0, cpu_count=32, saved_search_perc=50, ad_hoc_captain=0
+|eval secs_avail=300*((searches_per_cpu*cpu_count+max_base)*sh)
+|eval sched_secs_avail=300*((searches_per_cpu*cpu_count+max_base)*(sh-ad_hoc_captain)*saved_search_perc/100)
+|fields - sh max_base cpu_count saved_search_perc ad_hoc_captain searches_per_cpu
+
+
+###Notes
+Stacked area chart, with secs_avail and sched_secs_avail as overlay
