@@ -1,3 +1,3 @@
-host=<your_indexers> index=_internal source=/opt/splunk/var/log/splunk/remote_searches.log sourcetype=splunkd_remote_searches TERM(elapsedTime)  NOT search_id=*_rt_*
-| rex max_match=100 field=search_id "remote_.*\.(?<host>.*)\.domain.com.*”|eval cluster=some stuff…
-|timechart sum(elapsedTime) by cluster
+host=idx* index=_internal source=/opt/splunk/var/log/splunk/remote_searches.log sourcetype=splunkd_remote_searches TERM(elapsedTime) NOT search_id=*_rt_*
+| rex max_match=100 field=search_id "remote_.*\.(?<cluster>.*)\.domain.com.*"
+|timechart usenull=f sum(elapsedTime) by cluster
