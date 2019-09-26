@@ -1,7 +1,12 @@
 <form>
-  <label>search duration analysis</label>
+  <label>Search Analysis by Type</label>
+  <description>All panels are sorted by total run time per search. Change sort order as required</description>
   <search id="search_info">
-    <query>(index=_audit host=splunk-sh*  action=search info=granted OR info=completed  search_id  NOT typeahead   NOT "search_id='rsa_*") OR (index=_introspection  host=splunk-sh* TERM(provenance))  | rename data.search_props.sid AS sid data.search_props.provenance AS provenance
+    <query> $host$
+(index=_audit action=search info=granted OR info=completed  search_id  NOT typeahead   NOT "search_id='rsa_*") 
+OR 
+(index=_introspection  TERM(provenance))  
+| rename data.search_props.sid AS sid data.search_props.provenance AS provenance
 | rex "search=\'(?&lt;thesearch&gt;(?:\n|.)*?)\'\, autojoin"
 | rex max_match=100 field=search "(?:[^\"\']|^)index=(?&lt;indexes&gt;[^\s\=]+)"
 | rex max_match=100 field=search "tag=(?&lt;tags&gt;[^\s+\||\)]+)"
@@ -9,7 +14,7 @@
 | rex max_match=100 field=search "(?&lt;macros&gt;\`[^\s]+\`)"
 | eval total_days_searched=(search_lt-search_et)/86400
 | eval  total_hours_searched=total_days_searched*24
-| eval total_hours_searched=round(total_hours_searched,4)
+| eval total_hours_searched=round(total_hours_searched,1)
 | eval total_days_searched=round(total_days_searched,0)
 | eval search_id=trim(search_id,"\'")
 | eval search_id=coalesce(search_id,sid)
@@ -18,60 +23,40 @@
 | eval api_et=if(api_et="N/A", search_et, api_et)
 | eval total_hours_searched=if(api_et="N/A", "AllTime",total_hours_searched)
 | eval total_days_searched=if(api_et="N/A", "AllTime",total_days_searched)
-| stats sum(duration_command_search_rawdata_bucketcache_miss) AS  duration__raw_cache_miss sum(invocations_command_search_index_bucketcache_miss) as count_index_cache_miss sum(invocations_command_search_rawdata_bucketcache_miss) as count_rawdata_cache_miss values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched values(user) AS users values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  values(thesearch) AS search values(savedsearch_name) AS savedsearch_name max(total_run_time) AS run_time values(result_count) AS result_count values(event_count) AS event_count values(searched_buckets) AS searched_buckets values(info) AS info values(provenance) AS provenance dc(origSid) AS numofsearchesinquery by search_id</query>
+| stats values(host) as host sum(duration_command_search_rawdata_bucketcache_miss) AS  duration__raw_cache_miss sum(invocations_command_search_index_bucketcache_miss) as count_index_cache_miss sum(invocations_command_search_rawdata_bucketcache_miss) as count_rawdata_cache_miss values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched values(user) AS users values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  values(thesearch) AS search values(savedsearch_name) AS savedsearch_name max(total_run_time) AS run_time values(result_count) AS result_count values(event_count) AS event_count values(searched_buckets) AS searched_buckets values(info) AS info values(provenance) AS provenance dc(origSid) AS numofsearchesinquery by search_id
+</query>
     <earliest>$field1.earliest$</earliest>
     <latest>$field1.latest$</latest>
   </search>
   <fieldset submitButton="true" autoRun="false">
-    <input type="time" token="field1" searchWhenChanged="true">
+    <input type="multiselect" token="host" searchWhenChanged="true">
+      <label>Search Head</label>
+      <fieldForLabel>host</fieldForLabel>
+      <fieldForValue>host</fieldForValue>
+      <search>
+        <query>index=_introspection host=idx* component=PerProcess TERM(search_head) earliest=-20m |stats count by "data.search_props.search_head" |rename "data.search_props.search_head" as host |fields host</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+      <delimiter> OR </delimiter>
+      <valuePrefix>host=</valuePrefix>
+    </input>
+    <input type="time" token="field1">
       <label></label>
       <default>
-        <earliest>-12h</earliest>
+        <earliest>-4h@m</earliest>
         <latest>now</latest>
       </default>
     </input>
   </fieldset>
   <row>
     <panel>
-      <title>Searches skipping due to running longer than their scheduled time</title>
-      <table>
-        <title>Blank or 0 earliest_time means all time search unless defined in the search</title>
-        <search>
-          <query>index=_internal host=splunk-sh* sourcetype=scheduler ( status="skipped" OR status="continued" OR status="deferred") search_type!="*_acceleration"
-"The maximum number of concurrent running jobs for this historical scheduled search on this cluster has been reached"
-|stats dc(scheduled_time) as skip_count by savedsearch_name
-|sort - skip_count
-|join left savedsearch_name
-[
-|rest splunk_server=local /servicesNS/-/-/saved/searches
-  search="is_scheduled=1" search="disabled=0"
-  |fields search title author cron_schedule eai:acl.app dispatch.earliest_time dispatch.latest_time action.summary_index search
-  |rename title as savedsearch_name, dispatch.earliest_time as earliest_time, dispatch.latest_time AS latest_time
-]</query>
-          <earliest>$field1.earliest$</earliest>
-          <latest>$field1.latest$</latest>
-        </search>
-        <option name="count">10</option>
-        <option name="drilldown">none</option>
-        <option name="refresh.display">progressbar</option>
-      </table>
-    </panel>
-  </row>
-  <row>
-    <panel>
-      <title>Saved Search deep dive</title>
+      <title>Saved Searches for $host$</title>
       <table>
         <search base="search_info">
           <query>|search provenance=scheduler
 |search NOT savedsearch_name=""
-| stats count as number_of_runs  values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched  values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  last(search) AS search  max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time max(result_count) AS result_count max(event_count) AS event_count max(searched_buckets) AS searched_buckets values(info) AS info values(provenance) AS provenance values(numofsearchesinquery) AS numofsearchesinquery by  savedsearch_name users|sort - sum_run_time
-|join left savedsearch_name users
-[
-|rest splunk_server=local /servicesNS/-/-/saved/searches
-  search="is_scheduled=1" search="disabled=0"
-  |fields search title author cron_schedule eai:acl.app dispatch.earliest_time dispatch.latest_time
-  |rename title as savedsearch_name, dispatch.earliest_time as earliest_time, dispatch.latest_time AS latest_time, author as users
-]</query>
+| stats count as number_of_runs  values(host) as host values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched  values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  last(search) AS search  max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time max(result_count) AS result_count max(event_count) AS event_count max(searched_buckets) AS searched_buckets values(info) AS info values(provenance) AS provenance values(numofsearchesinquery) AS numofsearchesinquery by  savedsearch_name users|sort - sum_run_time</query>
         </search>
         <option name="count">10</option>
         <option name="drilldown">none</option>
@@ -81,12 +66,12 @@
   </row>
   <row>
     <panel>
-      <title>Ad-Hoc Search deep dive</title>
+      <title>Ad-Hoc Search</title>
       <table>
         <search base="search_info">
           <query>|search provenance=UI:Search
 |eval total_hours_searched=round(total_hours_searched,1)
-| stats count as number_of_runs  values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched  values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  last(search) AS search  max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time max(result_count) AS result_count max(event_count) AS event_count max(searched_buckets) AS searched_buckets values(info) AS info  values(numofsearchesinquery) AS numofsearchesinquery by  savedsearch_name users
+| stats count as number_of_runs values(host) as host values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched  values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time max(result_count) AS result_count max(event_count) AS event_count max(searched_buckets) AS searched_buckets values(info) AS info  values(numofsearchesinquery) AS numofsearchesinquery by  users search
 |eval avg_run_time=round(avg_run_time,1)
 |sort - sum_run_time</query>
         </search>
@@ -103,8 +88,10 @@
         <search base="search_info">
           <query>|search provenance=*Dashboard*
 |eval total_hours_searched=round(total_hours_searched,1)
-| stats count as number_of_runs  max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time sum(result_count) AS result_count sum(event_count) AS event_count sum(searched_buckets) AS searched_buckets  values(users) as users by   provenance
+| stats count as number_of_searches_run dc(savedsearch_name) as num_panels values(host) as host max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time sum(result_count) AS result_count sum(event_count) AS event_count sum(searched_buckets) AS searched_buckets  values(users) as users by   provenance 
 |eval avg_run_time=round(avg_run_time,1)
+|eval provenance=replace(provenance, "UI:Dashboard:", "")
+|rename provenance as dashboard
 |sort - sum_run_time</query>
         </search>
         <option name="count">10</option>
@@ -115,7 +102,7 @@
   </row>
   <row>
     <panel>
-      <title>Dashboard Deep dive</title>
+      <title>Dashboard Panel Deep dive</title>
       <input type="dropdown" token="provenance" searchWhenChanged="true">
         <label>Dashboard_name</label>
         <choice value="*">all</choice>
@@ -123,8 +110,7 @@
           <set token="selected_stack">*</set>
         </change>
         <search base="search_info">
-          <query>|search provenance=*Dashboard* |stats count by provenance |fields provenance
-|eval provenance=ltrim(provenance,"UI:Dashboard:")</query>
+          <query>|search provenance=*Dashboard* |stats count by provenance |eval provenance=replace(provenance, "UI:Dashboard:", "") |fields provenance</query>
         </search>
         <fieldForLabel>provenance</fieldForLabel>
         <fieldForValue>provenance</fieldForValue>
@@ -133,8 +119,10 @@
         <search base="search_info">
           <query>|search provenance=UI:Dashboard:$provenance$
 |eval total_hours_searched=round(total_hours_searched,1)
-| stats count as number_of_runs values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched  values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  last(search) AS search  max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time max(result_count) AS result_count max(event_count) AS event_count max(searched_buckets) AS searched_buckets values(info) AS info  values(numofsearchesinquery) AS numofsearchesinquery values(users) as users by  savedsearch_name provenance
+| stats count as number_of_runs values(host) as host values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched  values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  last(search) AS search  max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time max(result_count) AS result_count max(event_count) AS event_count max(searched_buckets) AS searched_buckets values(info) AS info  values(numofsearchesinquery) AS numofsearchesinquery values(users) as users by  savedsearch_name provenance 
 |eval avg_run_time=round(avg_run_time,1)
+|eval provenance=replace(provenance, "UI:Dashboard:", "")
+|rename provenance as dashboard
 |sort - sum_run_time</query>
         </search>
         <option name="count">10</option>
@@ -144,4 +132,3 @@
     </panel>
   </row>
 </form>
- 
