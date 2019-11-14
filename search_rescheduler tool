@@ -1,4 +1,3 @@
-####Heads up - The below does not work in Splunk 7.2. Need to investigate why!!!
 
 |rest splunk_server=local /servicesNS/-/-/saved/searches
  |search is_scheduled=1 disabled=0
