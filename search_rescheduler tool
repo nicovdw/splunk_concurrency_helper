@@ -1,21 +1,20 @@
-
 |rest splunk_server=local /servicesNS/-/-/saved/searches
- |search is_scheduled=1 disabled=0
- |fields search title author cron_schedule eai:acl.app eai:acl.sharing dispatch.earliest_time dispatch.latest_time action.summary_index search id
- | search NOT (dispatch.earliest_time=rt* OR dispatch.latest_time=rt* OR action.summary_index=1 OR search=*timechart* OR search=bin OR search=span OR search=*bucket*)
+ |search is_scheduled=1 disabled=0
+ |fields search title author cron_schedule eai:acl.app eai:acl.sharing dispatch.earliest_time dispatch.latest_time action.summary_index search id
+ | search NOT (dispatch.earliest_time=rt* OR dispatch.latest_time=rt* OR action.summary_index=1 OR search=*timechart* OR search=bin OR search=span OR search=*bucket*)
 |eval cron_type=case
-  (match(cron_schedule,"\*/5 \* \* \* \*"),5,
-  match(cron_schedule,"\*/10 \* \* \* \*"),10,
-  match(cron_schedule,"\*/15 \* \* \* \*"),15,
-  match(cron_schedule,"\*/30 \* \* \* \*"),30,
-  match(cron_schedule,"^0 \* \* \* \*"),0,0=0,-1)
+  (match(cron_schedule,"\*/5 \* \* \* \*"),5,
+  match(cron_schedule,"\*/10 \* \* \* \*"),10,
+  match(cron_schedule,"\*/15 \* \* \* \*"),15,
+  match(cron_schedule,"\*/30 \* \* \* \*"),30,
+  match(cron_schedule,"^0 \* \* \* \*"),0,0=0,-1)
 | where cron_type >= 0
 |sort cron_type
 | eval reset_count=case(cron_type=5,4, cron_type=10,9, cron_type=15,14, cron_type=30,29, cron_type=0,59)
-| streamstats count reset_after="count=reset_count" by cron_type
+| streamstats count reset_after="count=reset_count" by cron_type
 | eval lower_bound=count
 | eval upper_bound=59
-| eval new_cron=case(cron_type=0,count .  " * * * *", cron_type!=0,lower_bound . "-" . upper_bound . "/" . cron_type .  " * * * *")
-|eval change_script="curl -k -u admin:password -XPOST " + id + " -d " + "cron_schedule=\"" + new_cron + "\" || true"
-|eval rollback_script="curl -k -u admin:password -XPOST " + id + " -d " + "cron_schedule=\"" + cron_schedule + "\" || true"
-|fields  title author cron_schedule new_cron eai:acl.app eai:acl.sharing change_script rollback_script
+| eval new_cron=case(cron_type=0,count .  " * * * *", cron_type!=0,lower_bound . "-" . upper_bound . "/" . cron_type .  " * * * *")
+|eval change_script="curl -k -u admin:password -XPOST " + id + " -d " + "cron_schedule=\"" + new_cron + "\" || true"
+|eval rollback_script="curl -k -u admin:password -XPOST " + id + " -d " + "cron_schedule=\"" + cron_schedule + "\" || true"
+|fields  title author count reset_count cron_type cron_schedule new_cron eai:acl.app eai:acl.sharing change_script rollback_script
