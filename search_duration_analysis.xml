@@ -24,6 +24,7 @@ OR
 | eval total_hours_searched=if(api_et="N/A", "AllTime",total_hours_searched)
 | eval total_days_searched=if(api_et="N/A", "AllTime",total_days_searched)
 | stats values(host) as host sum(duration_command_search_rawdata_bucketcache_miss) AS  duration__raw_cache_miss sum(invocations_command_search_index_bucketcache_miss) as count_index_cache_miss sum(invocations_command_search_rawdata_bucketcache_miss) as count_rawdata_cache_miss values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched values(user) AS users values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  values(thesearch) AS search values(savedsearch_name) AS savedsearch_name max(total_run_time) AS run_time values(result_count) AS result_count values(event_count) AS event_count values(searched_buckets) AS searched_buckets values(info) AS info values(provenance) AS provenance dc(origSid) AS numofsearchesinquery by search_id
+|eval total_cache_miss =count_index_cache_miss+count_rawdata_cache_miss
 </query>
     <earliest>$field1.earliest$</earliest>
     <latest>$field1.latest$</latest>
@@ -56,7 +57,7 @@ OR
         <search base="search_info">
           <query>|search provenance=scheduler
 |search NOT savedsearch_name=""
-| stats count as number_of_runs  values(host) as host values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched  values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  last(search) AS search  max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time max(result_count) AS result_count max(event_count) AS event_count max(searched_buckets) AS searched_buckets values(info) AS info values(provenance) AS provenance values(numofsearchesinquery) AS numofsearchesinquery by  savedsearch_name users|sort - sum_run_time</query>
+| stats count as number_of_runs  values(host) as host values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched  values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  last(search) AS search  max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time sum(total_cache_miss) as total_cache_miss max(result_count) AS result_count max(event_count) AS event_count max(searched_buckets) AS searched_buckets values(info) AS info values(provenance) AS provenance values(numofsearchesinquery) AS numofsearchesinquery by  savedsearch_name users|sort - sum_run_time</query>
         </search>
         <option name="count">10</option>
         <option name="drilldown">none</option>
@@ -71,7 +72,7 @@ OR
         <search base="search_info">
           <query>|search provenance=UI:Search
 |eval total_hours_searched=round(total_hours_searched,1)
-| stats count as number_of_runs values(host) as host values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched  values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time max(result_count) AS result_count max(event_count) AS event_count max(searched_buckets) AS searched_buckets values(info) AS info  values(numofsearchesinquery) AS numofsearchesinquery by  users search
+| stats count as number_of_runs values(host) as host values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched  values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time sum(total_cache_miss) as total_cache_miss max(result_count) AS result_count max(event_count) AS event_count max(searched_buckets) AS searched_buckets values(info) AS info  values(numofsearchesinquery) AS numofsearchesinquery by  users search
 |eval avg_run_time=round(avg_run_time,1)
 |sort - sum_run_time</query>
         </search>
@@ -88,7 +89,7 @@ OR
         <search base="search_info">
           <query>|search provenance=*Dashboard*
 |eval total_hours_searched=round(total_hours_searched,1)
-| stats count as number_of_searches_run dc(savedsearch_name) as num_panels values(host) as host max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time sum(result_count) AS result_count sum(event_count) AS event_count sum(searched_buckets) AS searched_buckets  values(users) as users by   provenance 
+| stats count as number_of_searches_run dc(savedsearch_name) as num_panels values(host) as host max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time sum(total_cache_miss) as total_cache_miss sum(result_count) AS result_count sum(event_count) AS event_count sum(searched_buckets) AS searched_buckets  values(users) as users by   provenance 
 |eval avg_run_time=round(avg_run_time,1)
 |eval provenance=replace(provenance, "UI:Dashboard:", "")
 |rename provenance as dashboard
@@ -119,7 +120,7 @@ OR
         <search base="search_info">
           <query>|search provenance=UI:Dashboard:$provenance$
 |eval total_hours_searched=round(total_hours_searched,1)
-| stats count as number_of_runs values(host) as host values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched  values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  last(search) AS search  max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time max(result_count) AS result_count max(event_count) AS event_count max(searched_buckets) AS searched_buckets values(info) AS info  values(numofsearchesinquery) AS numofsearchesinquery values(users) as users by  savedsearch_name provenance 
+| stats count as number_of_runs values(host) as host values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched  values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  last(search) AS search  max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time sum(total_cache_miss) as total_cache_miss max(result_count) AS result_count max(event_count) AS event_count max(searched_buckets) AS searched_buckets values(info) AS info  values(numofsearchesinquery) AS numofsearchesinquery values(users) as users by  savedsearch_name provenance 
 |eval avg_run_time=round(avg_run_time,1)
 |eval provenance=replace(provenance, "UI:Dashboard:", "")
 |rename provenance as dashboard
