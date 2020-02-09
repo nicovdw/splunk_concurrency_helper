@@ -34,7 +34,7 @@ OR
       <fieldForLabel>host</fieldForLabel>
       <fieldForValue>host</fieldForValue>
       <search>
-        <query>index=_introspection host=idx* component=PerProcess TERM(search_head) earliest=-20m |stats count by "data.search_props.search_head" |rename "data.search_props.search_head" as host |fields host</query>
+        <query>index=_introspection component=PerProcess TERM(search_head) earliest=-20m |stats count by "data.search_props.search_head" |rename "data.search_props.search_head" as host |fields host</query>
         <earliest>-24h@h</earliest>
         <latest>now</latest>
       </search>
