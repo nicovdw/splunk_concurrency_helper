@@ -1,3 +1,6 @@
+#
+# Seconds per 5 minutes
+#
 index=_audit action=search host=<shcluster_search_heads> info="completed"  NOT "search_id='rsa_scheduler" 
 | eval search_type=case(match(search_id,"scheduler_"),"Scheduled",match(search_id,"SummaryDirector"),"Summarize")
 | eval search_type=if(isnull(search_type),"Ad-Hoc",search_type)
@@ -10,3 +13,30 @@ index=_audit action=search host=<shcluster_search_heads> info="completed"  NOT "
 
 ###Notes
 Stacked area chart, with secs_avail and sched_secs_avail as overlay
+
+
+#
+# Number of search processes
+#
+index=_audit action=search host=<shcluster_search_heads> NOT "search_id='rsa_scheduler"
+| fields - _raw
+| eval search_type=case(match(search_id,"scheduler_"),"Scheduled",match(search_id,"SummaryDirector"),"Summarize")
+| eval search_type=if(isnull(search_type),"Ad-Hoc",search_type)
+| eval end_time=exec_time + total_run_time
+| eval events=exec_time + " " + search_type + " 1:" + end_time + " " + search_type +" -1"
+| fields _time events
+| makemv delim=":" events
+| mvexpand events
+| rex field=events "(?<_time>\S+)\s+(?<type>\S+)\s+(?<incr>\S+)"
+| fields - events
+| sort 0 _time
+| streamstats current=f sum(incr) as concur by type
+| timechart bins=300 first(concur) as concur by type
+| eval sh=1, max_base=6, searches_per_cpu=1, cpu_count=36, saved_search_perc=50, ad_hoc_captain=0
+| eval concur_procs=(searches_per_cpu*cpu_count+max_base)*sh
+| eval sched_concur_procs=(searches_per_cpu*cpu_count+max_base)*(sh-ad_hoc_captain)*saved_search_perc/100
+| fields - sh max_base cpu_count saved_search_perc ad_hoc_captain searches_per_cpu
+
+
+###Notes
+Stacked area chart, with concur_procs and sched_concur_procs as overlay
