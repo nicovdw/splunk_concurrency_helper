@@ -1,0 +1,1102 @@
+<form>
+  <label>Search Analysis by Type</label>
+  <description>All panels are sorted by total run time per search. Change sort order as required  ----- Beta ----</description>
+  <search id="search_info">
+    <query> host IN($host$)
+(index=_audit action=search  search_id  NOT typeahead   NOT "search_id='rsa_*") 
+|rex field=_raw ", search=\'(?&lt;thesearch&gt;.*)"
+| rex max_match=100 field=search "(?:[^\"\']|^)index=(?&lt;indexes&gt;[^\s\=]+)"
+| rex max_match=100 field=search "tag=(?&lt;tags&gt;[^\s+\||\)]+)"
+| rex max_match=100 field=search "eventtype=(?&lt;eventtypes&gt;[^\s+\||\)]+)"
+| rex max_match=100 field=search "(?&lt;macros&gt;\`[^\s]+\`)"
+| eval total_days_searched=(search_lt-search_et)/86400
+| eval  total_hours_searched=total_days_searched*24
+| eval total_hours_searched=round(total_hours_searched,1)
+| eval total_days_searched=round(total_days_searched,0)
+| eval search_id=trim(search_id,"\'")
+| eval search_id=coalesce(search_id,sid)
+| eval origSid=search_id
+| eval app = app
+| rex field=search_id "subsearch_(?&lt;search_id&gt;.*)_\d+\.\d+"
+| eval api_et=if(api_et="N/A", search_et, api_et)
+| eval total_hours_searched=if(api_et="N/A", "AllTime",total_hours_searched)
+| eval total_days_searched=if(api_et="N/A", "AllTime",total_days_searched)
+|eval provenance=if(provenance="N/A",NULL,provenance)
+|eval provenance=if(provenance="UI:LocateData",NULL,provenance)
+| stats values(host) as host sum(duration_command_search_rawdata_bucketcache_miss) AS  duration__raw_cache_miss sum(invocations_command_search_index_bucketcache_miss) as count_index_cache_miss sum(invocations_command_search_rawdata_bucketcache_miss) as count_rawdata_cache_miss  values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched values(user) AS users values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  last(search) AS search values(savedsearch_name) AS savedsearch_name max(total_run_time) AS run_time values(result_count) AS result_count values(event_count) AS event_count values(searched_buckets) AS searched_buckets values(info) AS info values(provenance) AS provenance dc(origSid) AS numofsearchesinquery by search_id app
+|eval total_cache_miss=count_index_cache_miss+count_rawdata_cache_miss
+$cache_count$
+|join host
+[search index=_internal host=sh-*.splunkcloud.com metrics (sh_cluster_label OR comp=router) earliest=-2h
+|stats values(sh_cluster_label) as sh_cluster_label latest(appNames) as appNames by host
+|eval sh_label=if(isnotnull(sh_cluster_label),sh_cluster_label,"Ad-Hoc")
+|eval sh_label=if(match(appNames,"itsi"),"itsi", sh_label)
+|eval sh_label=if(match(appNames,"SplunkEnterpriseSecuritySuite"),"EnterpriseSecurity", sh_label)
+|fields host sh_label]
+
+</query>
+    <earliest>$field1.earliest$</earliest>
+    <latest>$field1.latest$</latest>
+  </search>
+  <fieldset submitButton="true" autoRun="false">
+    <input type="checkbox" token="host" searchWhenChanged="false">
+      <label>Host</label>
+      <fieldForLabel>sh_label</fieldForLabel>
+      <fieldForValue>host</fieldForValue>
+      <search>
+        <query>index=_internal host=sh-*.splunkcloud.com metrics (sh_cluster_label OR comp=router)
+earliest=-2h
+|stats values(sh_cluster_label) as sh_cluster_label latest(appNames) as appNames by host
+|eval sh_label=if(isnotnull(sh_cluster_label),sh_cluster_label,"Ad-Hoc")
+|eval sh_label=if(match(appNames,"itsi"),"itsi", sh_label)
+|eval sh_label=if(match(appNames,"SplunkEnterpriseSecuritySuite"),"EnterpriseSecurity", sh_label)
+|stats values(host) as host by sh_label</query>
+      </search>
+      <delimiter> </delimiter>
+    </input>
+    <input type="radio" token="cache_count" searchWhenChanged="true">
+      <label>Show only S2 Cache Impacting</label>
+      <choice value="">No</choice>
+      <choice value="| search total_cache_miss&gt;0">Yes</choice>
+      <default></default>
+    </input>
+    <input type="radio" token="no_show_search" searchWhenChanged="true">
+      <label>Show Search String</label>
+      <choice value="">Yes</choice>
+      <choice value="| fields - search">No</choice>
+      <default></default>
+    </input>
+    <input type="time" token="field1">
+      <label></label>
+      <default>
+        <earliest>-4h@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Total runtime by Type</title>
+      <table>
+        <search base="search_info">
+          <query>|rex field=provenance mode=sed "s/UI:Dashboard:.*/Dashboard/"
+|chart sum(run_time) as Total_runtime by sh_label provenance 
+|eval Total_runtime=round(Total_runtime,0)
+|addtotals</query>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="totalsRow">true</option>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="rest">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="rest">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="UI:Search">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="rest">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="rest">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="UI:Search">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Dashboard">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="N/A"></format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Total Cache Miss by Type</title>
+      <table>
+        <search base="search_info">
+          <query>|rex field=provenance mode=sed "s/UI:Dashboard:.*/Dashboard/"
+|chart sum(total_cache_miss) as Total_Cache_Miss by sh_label provenance 
+|addtotals</query>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="totalsRow">true</option>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="rest">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="rest">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="UI:Search">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="rest">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="rest">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="UI:Search">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Dashboard">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="N/A"></format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="rest">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="rest">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="UI:Search">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="rest">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Total">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="NULL">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="summary_director">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="scheduler">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="rest">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="UI:Search">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="Dashboard">
+          <option name="precision">0</option>
+        </format>
+        <format type="number" field="N/A"></format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Saved Searches</title>
+      <table>
+        <search base="search_info">
+          <query>|search provenance=scheduler
+|search NOT savedsearch_name=""
+| stats count as number_of_runs  values(sh_label) as host values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched  values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  last(search) AS search  max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time  sum(total_cache_miss) as total_cache_miss max(result_count) AS result_count max(event_count) AS event_count max(searched_buckets) AS searched_buckets values(info) AS info values(provenance) AS provenance values(numofsearchesinquery) AS numofsearchesinquery by  savedsearch_name users|sort - sum_run_time
+$no_show_search$</query>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <format type="color" field="sum_run_time">
+          <colorPalette type="minMidMax" maxColor="#DC4E41" minColor="#FFFFFF"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <format type="color" field="sum_run_time">
+          <colorPalette type="minMidMax" maxColor="#DC4E41" minColor="#FFFFFF"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <format type="color" field="total_cache_miss">
+          <colorPalette type="minMidMax" maxColor="#DC4E41" minColor="#FFFFFF"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <format type="number" field="avg_run_time">
+          <option name="precision">1</option>
+        </format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Ad-Hoc Search</title>
+      <table>
+        <search base="search_info">
+          <query>|search provenance=UI:Search
+|eval total_hours_searched=round(total_hours_searched,1)
+| stats count as number_of_runs values(sh_label) as host values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched  values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time  sum(total_cache_miss) as total_cache_miss max(result_count) AS result_count max(event_count) AS event_count max(searched_buckets) AS searched_buckets values(info) AS info  values(numofsearchesinquery) AS numofsearchesinquery by  users search
+|eval avg_run_time=round(avg_run_time,1)
+|sort - sum_run_time</query>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <format type="color" field="sum_run_time">
+          <colorPalette type="minMidMax" maxColor="#DC4E41" minColor="#FFFFFF"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <format type="color" field="sum_run_time">
+          <colorPalette type="minMidMax" maxColor="#DC4E41" minColor="#FFFFFF"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <format type="color" field="total_cache_miss">
+          <colorPalette type="minMidMax" maxColor="#DC4E41" minColor="#FFFFFF"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Dashboard Overview</title>
+      <table>
+        <search base="search_info">
+          <query>|search provenance=*Dashboard*
+|eval total_hours_searched=round(total_hours_searched,1)
+| stats count as number_of_searches_run dc(savedsearch_name) as num_panels values(sh_label) as host max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time  sum(total_cache_miss) as total_cache_miss sum(result_count) AS result_count sum(event_count) AS event_count sum(searched_buckets) AS searched_buckets  values(users) as users by provenance app
+|eval avg_run_time=round(avg_run_time,1)
+|eval provenance=replace(provenance, "UI:Dashboard:", "")
+|rename provenance as dashboard
+|sort - sum_run_time</query>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <format type="color" field="total_cache_miss">
+          <colorPalette type="minMidMax" maxColor="#DC4E41" minColor="#FFFFFF"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <format type="color" field="total_cache_miss">
+          <colorPalette type="minMidMax" maxColor="#DC4E41" minColor="#FFFFFF"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <format type="color" field="sum_run_time">
+          <colorPalette type="minMidMax" maxColor="#DC4E41" minColor="#FFFFFF"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Dashboard Panel Deep dive</title>
+      <input type="dropdown" token="provenance" searchWhenChanged="true">
+        <label>Dashboard_name</label>
+        <choice value="*">all</choice>
+        <change>
+          <set token="selected_stack">*</set>
+        </change>
+        <search base="search_info">
+          <query>|search provenance=*Dashboard* |stats count by provenance |eval provenance=replace(provenance, "UI:Dashboard:", "") |fields provenance</query>
+        </search>
+        <fieldForLabel>provenance</fieldForLabel>
+        <fieldForValue>provenance</fieldForValue>
+      </input>
+      <table>
+        <search base="search_info">
+          <query>|search provenance=UI:Dashboard:$provenance$
+|eval total_hours_searched=round(total_hours_searched,1)
+| stats count as number_of_runs values(sh_label) as host values(total_hours_searched) AS total_hours_searched values(total_days_searched) AS total_days_searched  values(indexes) AS indexes  values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags  last(search) AS search  max(run_time) AS max_run_time avg(run_time) AS avg_run_time  sum(run_time) AS sum_run_time  sum(total_cache_miss) as total_cache_miss max(result_count) AS result_count max(event_count) AS event_count max(searched_buckets) AS searched_buckets values(info) AS info  values(numofsearchesinquery) AS numofsearchesinquery values(users) as users by  savedsearch_name provenance 
+|eval avg_run_time=round(avg_run_time,1)
+|eval provenance=replace(provenance, "UI:Dashboard:", "")
+|rename provenance as dashboard
+|sort - sum_run_time</query>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <format type="color" field="sum_run_time">
+          <colorPalette type="minMidMax" maxColor="#DC4E41" minColor="#FFFFFF"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <format type="color" field="sum_run_time">
+          <colorPalette type="minMidMax" maxColor="#DC4E41" minColor="#FFFFFF"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <format type="color" field="total_cache_miss">
+          <colorPalette type="minMidMax" maxColor="#DC4E41" minColor="#FFFFFF"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+      </table>
+    </panel>
+  </row>
+</form>
