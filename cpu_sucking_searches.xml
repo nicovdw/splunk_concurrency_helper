@@ -25,30 +25,6 @@
   </fieldset>
   <row>
     <panel>
-      <title>90th Percentile CPU Usage by Indexer</title>
-      <chart>
-        <search>
-          <query>index=_introspection host=idx-i*  component=Hostwide |eval cpu_used_pct='data.cpu_system_pct'+'data.cpu_user_pct' | timechart span=$span$ limit=220 p90(cpu_used_pct) by host</query>
-          <earliest>$timerange.earliest$</earliest>
-          <latest>$timerange.latest$</latest>
-        </search>
-        <search type="annotation" base="annotation_idx">
-          <query>
-</query>
-        </search>
-        <option name="charting.axisLabelsY.majorUnit">25</option>
-        <option name="charting.axisY.maximumNumber">100</option>
-        <option name="charting.chart">line</option>
-        <option name="charting.drilldown">none</option>
-        <option name="charting.legend.labelStyle.overflowMode">ellipsisEnd</option>
-        <option name="charting.legend.placement">none</option>
-        <option name="height">500</option>
-        <option name="refresh.display">progressbar</option>
-      </chart>
-    </panel>
-  </row>
-  <row>
-    <panel>
       <title>CPU usage by type</title>
       <chart>
         <search base="base">
